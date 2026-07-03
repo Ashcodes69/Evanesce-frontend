@@ -1,65 +1,117 @@
-import Image from "next/image";
+"use client";
+import Link from "next/link";
+import { useState, FormEvent, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "./src/services/api";
 
-export default function Home() {
+interface UserPublic {
+  username: string;
+  id: number;
+}
+
+export default function Page() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userResult, setUserResult] = useState<UserPublic | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [username, setUsername] = useState("");
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!localStorage.getItem("token")) {
+      router.push("/auth/login");
+    }
+    const fetchMe = async () => {
+      try {
+        const res = await api.get("/me");
+        setUsername(res.data.username);
+      }catch (err){
+        router.push("/auth/login");
+      }
+    };
+    fetchMe();
+  }, []);
+
+  const handleSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      setError("please enter a username");
+      return;
+    }
+    setError("");
+    setUserResult(null);
+    setLoading(true);
+    try {
+      const response = await api.get(`/users/search/${searchQuery}`);
+      setUserResult(response.data);
+    } catch (err: any) {
+      if (err.response && err.response.status === 404) {
+        setError(err.response.data.detail);
+      } else {
+        setError("something went wrong while searching.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <>
+      <div className=" min-h-screen bg-black flex items-center justify-center p-6">
+        <div className="w-full max-w-2xl border border-white/20 rounded-3xl px-16 py-20 flex flex-col items-center gap-8">
+          {/* Greeting */}
+          <h1 className="text-white text-6xl font-normal tracking-wide" style={{ fontFamily: 'var(--font-caveat)' }}>
+            hello <span className="font-semibold">{username || "..."}</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          {/* Subtext */}
+          <p className="text-white/70 text-3xl">
+            who you want to talk to today
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          {/* Search form */}
+          <form
+            onSubmit={handleSearch}
+            className="flex items-center gap-3 w-full justify-center mt-2"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="search by exact username"
+              className=" bg-transparent border border-white/40 rounded-xl px-5 py-2 text-white text-xl placeholder-white/40 focus:outline-none focus:border-white/70 w-72 transition"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <button
+              type="submit"
+              disabled={loading}
+              className=" bg-green-700 hover:bg-green-600 disabled:bg-green-900 text-white text-xl px-7 py-2 rounded-xl transition"
+            >
+              {loading ? "searching…" : "search"}
+            </button>
+          </form>
+
+          {/* Error */}
+          {error && <p className="text-red-400 text-xl">{error}</p>}
+
+          {/* Result */}
+          {userResult && (
+            <div className="flex flex-col items-center gap-4 mt-2">
+              <p className="text-white/60 text-2xl">
+                found{" "}
+                <span className="text-white font-semibold">
+                  @{userResult.username}
+                </span>
+              </p>
+              <Link
+                href={`/messages/${userResult.id}`}
+                className=" bg-green-700 hover:bg-green-600 text-white text-xl px-8 py-2 rounded-xl transition"
+              >
+                message {userResult.username}
+              </Link>
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }
