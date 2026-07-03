@@ -1,7 +1,7 @@
 "use client";
 import { api } from "@/app/src/services/api";
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 interface Message {
   id: number;
@@ -9,6 +9,7 @@ interface Message {
   receiver_id: number;
   content: string;
   status?: string;
+  created_at: string;
 }
 
 export default function MessageThread() {
@@ -27,6 +28,8 @@ export default function MessageThread() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const router = useRouter();
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
@@ -36,7 +39,7 @@ export default function MessageThread() {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          setError("You must be logged in to view messages.");
+          router.push("/auth/login");
           setLoading(false);
           return;
         }
@@ -50,6 +53,12 @@ export default function MessageThread() {
 
         setMessages(historyResponse.data);
         setChatUserName(userProfileResponse.data.username);
+
+        api.put(
+          `/messages/seen/${userId}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
       } catch (err: any) {
         console.log(err);
         setError("Failed to load chat data.");
@@ -90,6 +99,7 @@ export default function MessageThread() {
             receiver_id: parseInt(userId),
             content: data.message,
             status: data.status,
+            created_at: data.created_at,
           },
         ]);
 
@@ -136,10 +146,18 @@ export default function MessageThread() {
         receiver_id: parseInt(userId),
         content: newMessage,
         status: "sent",
+        created_at: new Date().toISOString(),
       },
     ]);
 
     setNewMessage("");
+  };
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp.replace(" ", "T"));
+
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   if (loading) {
@@ -185,6 +203,13 @@ export default function MessageThread() {
                     }`}
                   >
                     <p className="text-sm">{msg.content}</p>
+                    {msg.created_at && (
+                      <p
+                        className={`text-[10px] mt-1 ${isFromOtherUser ? "text-white/40" : "text-white/70"}`}
+                      >
+                        {formatTime(msg.created_at)}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
