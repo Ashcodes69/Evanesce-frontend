@@ -20,6 +20,8 @@ export default function MessageThread() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [newMessage, setNewMessage] = useState("");
+  const [userStatus, setUserStatus] = useState("");
+  const [lastSeen, setLastSeen] = useState("");
 
   const [chatUserName, setChatUserName] = useState("Loading...");
 
@@ -33,6 +35,23 @@ export default function MessageThread() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const fetchInitialStatus = async () => {
+      try {
+        const statusRes = await api.get(`/users/status/${userId}`);
+        const status = statusRes.data.status
+        setUserStatus(status);
+        if (status == "offline") {
+          const lastSeenRes = await api.get(`/users/last-seen/${userId}`);
+          setLastSeen(lastSeenRes.data.last_seen);
+        }
+      } catch (err) {
+        console.error("Failed to fetch status", err);
+      }
+    };
+    if (userId) fetchInitialStatus();
+  }, [userId]);
 
   useEffect(() => {
     const fetchChatData = async () => {
@@ -82,6 +101,14 @@ export default function MessageThread() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      if (data.type == "presence" && data.user_id.toString() == userId) {
+        setUserStatus(data.status);
+        if (data.status == "offline" && data.last_seen) {
+          setLastSeen(data.last_seen);
+        }
+        return;
+      }
 
       if (data.type === "typing" && data.from.toString() === userId) {
         setIsTyping(true);
@@ -159,6 +186,17 @@ export default function MessageThread() {
     if (isNaN(date.getTime())) return "";
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+  
+  const formatLastSeen = (timestamp: string) => {
+    const date = new Date(timestamp.replace(" ", "T"));
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   if (loading) {
     return (
@@ -173,6 +211,15 @@ export default function MessageThread() {
       <div className="mx-auto flex w-full max-w-2xl flex-col rounded-xl border border-white/20 bg-black overflow-hidden h-[80vh]">
         <div className="border-b border-white/20 p-4 text-white">
           <h2 className="text-xl font-bold">{chatUserName}</h2>
+          <p className="text-xs text-white/50">
+            {userStatus === "online" ? (
+              <span className="text-green-400">● online</span>
+            ) : lastSeen ? (
+              `last seen ${formatLastSeen(lastSeen)}`
+            ) : (
+              "offline"
+            )}
+          </p>
         </div>
 
         {error && (
