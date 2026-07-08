@@ -8,7 +8,8 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoding] = useState(false);
   const [userName, setUserName] = useState("");
-  const [phNum, setPhNum] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [conformedPassword, setConformedPassword] = useState("");
 
@@ -20,8 +21,11 @@ export default function Register() {
     if (name === "userName") {
       setUserName(value);
     }
-    if (name === "phNum") {
-      setPhNum(value);
+    if (name === "fullName") {
+      setFullName(value);
+    }
+    if (name === "email") {
+      setEmail(value);
     }
     if (name === "password") {
       setPassword(value);
@@ -35,12 +39,18 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
+    if (password !== conformedPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     try {
       setLoding(true);
 
       const responce = await api.post("register", {
         username: userName,
-        phone_number: phNum,
+        full_name: fullName,
+        email: email,
         password: password,
       });
 
@@ -103,26 +113,45 @@ export default function Register() {
                   value={userName}
                   onChange={handleChange}
                   className="mt-1 block w-full rounded-md border border-white/30 bg-transparent px-3 py-2 text-white placeholder-white/30 shadow-sm focus:border-white/70 focus:outline-none sm:text-sm"
+                  placeholder="johndoe"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="fullName"
+                  className="block text-sm font-medium text-white/70"
+                >
+                  Full Name
+                </label>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border border-white/30 bg-transparent px-3 py-2 text-white placeholder-white/30 shadow-sm focus:border-white/70 focus:outline-none sm:text-sm"
                   placeholder="John Doe"
                 />
               </div>
 
               <div>
                 <label
-                  htmlFor="phNum"
+                  htmlFor="email"
                   className="block text-sm font-medium text-white/70"
                 >
-                  Phone Number
+                  Email
                 </label>
                 <input
-                  id="phNum"
-                  name="phNum"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   required
-                  value={phNum}
+                  value={email}
                   onChange={handleChange}
                   className="mt-1 block w-full rounded-md border border-white/30 bg-transparent px-3 py-2 text-white placeholder-white/30 shadow-sm focus:border-white/70 focus:outline-none sm:text-sm"
-                  placeholder="0000000000"
+                  placeholder="john@example.com"
                 />
               </div>
 
@@ -168,9 +197,10 @@ export default function Register() {
             <div>
               <button
                 type="submit"
-                className="flex w-full justify-center rounded-md border border-transparent bg-green-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                disabled={loading}
+                className="flex w-full justify-center rounded-md border border-transparent bg-green-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
               >
-                Sign up
+                {loading ? "Signing up..." : "Sign up"}
               </button>
             </div>
 
