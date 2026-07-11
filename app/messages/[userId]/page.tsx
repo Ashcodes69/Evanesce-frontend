@@ -24,6 +24,7 @@ export default function MessageThread() {
   const [lastSeen, setLastSeen] = useState("");
 
   const [chatUserName, setChatUserName] = useState("Loading...");
+  const [chatFullName, setChatFullName] = useState("");
 
   const [isTyping, setIsTyping] = useState(false);
   const ws = useRef<WebSocket | null>(null);
@@ -40,7 +41,7 @@ export default function MessageThread() {
     const fetchInitialStatus = async () => {
       try {
         const statusRes = await api.get(`/users/status/${userId}`);
-        const status = statusRes.data.status
+        const status = statusRes.data.status;
         setUserStatus(status);
         if (status == "offline") {
           const lastSeenRes = await api.get(`/users/last-seen/${userId}`);
@@ -72,6 +73,8 @@ export default function MessageThread() {
 
         setMessages(historyResponse.data);
         setChatUserName(userProfileResponse.data.username);
+        setChatFullName(userProfileResponse.data.full_name);
+        console.log(userProfileResponse.data.full_name)
 
         api.put(
           `/messages/seen/${userId}`,
@@ -82,6 +85,7 @@ export default function MessageThread() {
         console.log(err);
         setError("Failed to load chat data.");
         setChatUserName("Unknown User");
+        setChatFullName("");
       } finally {
         setLoading(false);
       }
@@ -186,7 +190,7 @@ export default function MessageThread() {
     if (isNaN(date.getTime())) return "";
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
-  
+
   const formatLastSeen = (timestamp: string) => {
     const date = new Date(timestamp.replace(" ", "T"));
     if (isNaN(date.getTime())) return "";
@@ -200,7 +204,7 @@ export default function MessageThread() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black text-white/50">
+      <div className="flex min-h-screen items-top justify-center bg-black text-white/50">
         Loading chat...
       </div>
     );
@@ -210,7 +214,8 @@ export default function MessageThread() {
     <div className="flex min-h-screen flex-col bg-black p-4 sm:p-8">
       <div className="mx-auto flex w-full max-w-2xl flex-col rounded-xl border border-white/20 bg-black overflow-hidden h-[80vh]">
         <div className="border-b border-white/20 p-4 text-white">
-          <h2 className="text-xl font-bold">{chatUserName}</h2>
+          <h2 className="text-xl font-bold">{chatFullName}</h2>
+          <p className="text-sm text-white/50">@{chatUserName}</p>
           <p className="text-xs text-white/50">
             {userStatus === "online" ? (
               <span className="text-green-400">● online</span>
