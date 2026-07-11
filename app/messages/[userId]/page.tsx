@@ -2,6 +2,7 @@
 import { api } from "@/app/src/services/api";
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAlert } from "@/app/Context/AlertContext";
 
 interface Message {
   id: number;
@@ -27,15 +28,31 @@ export default function MessageThread() {
   const [chatFullName, setChatFullName] = useState("");
 
   const [isTyping, setIsTyping] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+
   const ws = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
+  const { showConfirm, showAlert } = useAlert();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // close the dropdown when clicking outside it
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchInitialStatus = async () => {
@@ -74,7 +91,6 @@ export default function MessageThread() {
         setMessages(historyResponse.data);
         setChatUserName(userProfileResponse.data.username);
         setChatFullName(userProfileResponse.data.full_name);
-        console.log(userProfileResponse.data.full_name)
 
         api.put(
           `/messages/seen/${userId}`,
@@ -184,6 +200,27 @@ export default function MessageThread() {
     setNewMessage("");
   };
 
+  const handleBlockClick = () => {
+    setMenuOpen(false);
+    showConfirm(
+      `Block ${chatFullName || chatUserName}? They won't be able to message you anymore.`,
+      async () => {
+        setBlocking(true);
+        try {
+          await api.post(`/connections/${userId}/block`);
+          router.push("/");
+        } catch (err: any) {
+          showAlert(
+            err.response?.data?.detail || "Failed to block user.",
+            false,
+          );
+        } finally {
+          setBlocking(false);
+        }
+      },
+    );
+  };
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp.replace(" ", "T"));
 
@@ -213,18 +250,49 @@ export default function MessageThread() {
   return (
     <div className="flex min-h-screen flex-col bg-black p-4 sm:p-8">
       <div className="mx-auto flex w-full max-w-2xl flex-col rounded-xl border border-white/20 bg-black overflow-hidden h-[80vh]">
-        <div className="border-b border-white/20 p-4 text-white">
-          <h2 className="text-xl font-bold">{chatFullName}</h2>
-          <p className="text-sm text-white/50">@{chatUserName}</p>
-          <p className="text-xs text-white/50">
-            {userStatus === "online" ? (
-              <span className="text-green-400">● online</span>
-            ) : lastSeen ? (
-              `last seen ${formatLastSeen(lastSeen)}`
-            ) : (
-              "offline"
+        <div className="border-b border-white/20 p-4 text-white flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-bold">{chatFullName}</h2>
+            <p className="text-sm text-white/50">@{chatUserName}</p>
+            <p className="text-xs text-white/50">
+              {userStatus === "online" ? (
+                <span className="text-green-400">● online</span>
+              ) : lastSeen ? (
+                `last seen ${formatLastSeen(lastSeen)}`
+              ) : (
+                "offline"
+              )}
+            </p>
+          </div>
+
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="chat options"
+              className="text-white/60 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10 transition"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-5 h-5"
+              >
+                <path d="M12 6a1.75 1.75 0 110-3.5A1.75 1.75 0 0112 6zm0 7.75a1.75 1.75 0 110-3.5 1.75 1.75 0 010 3.5zM12 21.5a1.75 1.75 0 110-3.5 1.75 1.75 0 010 3.5z" />
+              </svg>
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-black border border-white/20 rounded-xl shadow-lg overflow-hidden z-10">
+                <button
+                  onClick={handleBlockClick}
+                  disabled={blocking}
+                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 transition disabled:opacity-50"
+                >
+                  {blocking ? "blocking..." : "block"}
+                </button>
+              </div>
             )}
-          </p>
+          </div>
         </div>
 
         {error && (

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/app/src/services/api";
+import { useAlert } from "@/app/Context/AlertContext";
 
 interface RecentChat {
   user_id: number;
@@ -20,6 +21,7 @@ export default function Navbar() {
   const [requestCount, setRequestCount] = useState(0);
   const [recentChats, setRecentChats] = useState<RecentChat[]>([]);
   const router = useRouter();
+  const { showConfirm } = useAlert();
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -139,7 +141,7 @@ export default function Navbar() {
           </div>
 
           <Link
-            href="/requests"
+            href="/connections/requests"
             onClick={() => setLeftOpen(false)}
             className="flex items-center justify-between px-3 py-2 mb-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition border border-white/10"
           >
@@ -223,10 +225,21 @@ export default function Navbar() {
               </button>
             </li>
             <li>
+              <Link
+                href="/connections/blocklist"
+                onClick={() => setRightOpen(false)}
+                className="block px-3 py-2 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition"
+              >
+                blocklist
+              </Link>
+            </li>
+            <li>
               <button
                 onClick={() => {
-                  localStorage.removeItem("token");
-                  router.push("/auth/login");
+                  showConfirm("Are you sure you want to log out?", () => {
+                    localStorage.removeItem("token");
+                    router.push("/auth/login");
+                  });
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg text-red-400 hover:bg-red-900/20 transition"
               >

@@ -3,6 +3,7 @@ import { api } from "@/app/src/services/api";
 import { useState, ChangeEvent, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAlert } from "@/app/Context/AlertContext";
 
 export default function Login() {
   const [error, setError] = useState("");
@@ -10,6 +11,7 @@ export default function Login() {
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
+  const {showAlert} = useAlert()
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -40,17 +42,14 @@ export default function Login() {
         },
       });
 
-      console.log(responce.data);
-
       // 3. Save the access token so the user stays logged in!
       const token = responce.data.access_token;
       localStorage.setItem("token", token);
 
-      alert("Log in successful!");
+      showAlert("Log-in successfull", true)
       router.push("/");
     } catch (error: any) {
       console.log(error);
-
       // 4. Handle the specific 401 errors from your FastAPI backend
       if (error.response && error.response.status === 401) {
         setError(error.response.data.detail); // This will display "Invalid username" or "Invalid password" directly in your UI!

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "../src/services/api";
+import { api } from "../../src/services/api";
 
 interface IncomingRequest {
   connection_id: number;
@@ -37,10 +37,11 @@ export default function Requests() {
     fetchRequests();
   }, []);
 
-  const handleAccept = async (connectionId: number) => {
+  const handleAccept = async (connectionId: number, userId: number) => {
     setActionLoadingId(connectionId);
     try {
       await api.post(`/connections/${connectionId}/accept`);
+      router.push(`/messages/${userId}`)
       setRequests((prev) =>
         prev.filter((r) => r.connection_id !== connectionId),
       );
@@ -102,7 +103,7 @@ export default function Requests() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleAccept(req.connection_id)}
+                    onClick={() => handleAccept(req.connection_id, req.user_id)}
                     disabled={actionLoadingId === req.connection_id}
                     className="bg-green-700 hover:bg-green-600 disabled:bg-green-900 text-white px-4 py-2 rounded-lg transition"
                   >

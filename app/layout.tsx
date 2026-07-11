@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import "./globals.css";
 import { Caveat, Space_Grotesk } from "next/font/google";
+import { AlertProvider } from "./Context/AlertContext";
 
 const caveat = Caveat({
   subsets: ["latin"],
@@ -17,8 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={caveat.variable}>
       <body>
+        <AlertProvider>        
         <Navbar />
         {children}
+        </AlertProvider>
       </body>
     </html>
   );
