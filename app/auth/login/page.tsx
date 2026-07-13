@@ -11,7 +11,7 @@ export default function Login() {
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
-  const {showAlert} = useAlert()
+  const { showAlert } = useAlert();
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -45,8 +45,8 @@ export default function Login() {
       // 3. Save the access token so the user stays logged in!
       const token = responce.data.access_token;
       localStorage.setItem("token", token);
-
-      showAlert("Log-in successfull", true)
+      window.dispatchEvent(new Event("auth-changed"));
+      showAlert("Log-in successfull", true);
       router.push("/");
     } catch (error: any) {
       console.log(error);

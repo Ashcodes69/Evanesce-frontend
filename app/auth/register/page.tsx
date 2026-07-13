@@ -15,7 +15,7 @@ export default function Register() {
   const [conformedPassword, setConformedPassword] = useState("");
 
   const router = useRouter();
-  const {showAlert} = useAlert();
+  const { showAlert } = useAlert();
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -58,10 +58,9 @@ export default function Register() {
 
       const token = responce.data.access_token;
       localStorage.setItem("token", token);
-
-      showAlert("Registration successfull", true)
+      window.dispatchEvent(new Event("auth-changed"));
+      showAlert("Registration successfull", true);
       router.push("/");
-
     } catch (error: any) {
       console.log(error);
       if (error.response) {
@@ -71,7 +70,7 @@ export default function Register() {
         console.log("Network/Other Error:", error);
       }
       setLoding(false);
-      showAlert("Registration failed", false)
+      showAlert("Registration failed", false);
     }
   };
   return (

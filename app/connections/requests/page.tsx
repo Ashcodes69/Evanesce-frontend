@@ -41,7 +41,11 @@ export default function Requests() {
     setActionLoadingId(connectionId);
     try {
       await api.post(`/connections/${connectionId}/accept`);
+
+      window.dispatchEvent(new Event("connection-accepted-local"))
+
       router.push(`/messages/${userId}`)
+      
       setRequests((prev) =>
         prev.filter((r) => r.connection_id !== connectionId),
       );

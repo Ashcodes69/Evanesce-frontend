@@ -2,9 +2,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { api } from "@/app/src/services/api";
 import { useAlert } from "@/app/Context/AlertContext";
+import { useWebSocketContext } from "@/app/Context/WebSocketContext";
 
 interface RecentChat {
   user_id: number;
@@ -21,7 +22,9 @@ export default function Navbar() {
   const [requestCount, setRequestCount] = useState(0);
   const [recentChats, setRecentChats] = useState<RecentChat[]>([]);
   const router = useRouter();
+  const pathname = usePathname();
   const { showConfirm } = useAlert();
+  const { addListener } = useWebSocketContext();
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -53,6 +56,96 @@ export default function Navbar() {
       }
     };
     fetchRecentChats();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = addListener((data) => {
+      if (data.type === "connection_request") {
+        setRequestCount((prev) => prev + 1);
+      }
+
+      if (data.type === "connection_accepted") {
+        // a new connection just formed — refresh recent chats so it appears immediately
+        api.get("/conversations").then((res) => setRecentChats(res.data));
+      }
+
+      if (data.type === "connection_blocked") {
+        setRecentChats((prev) =>
+          prev.filter((c) => c.user_id !== data.user_id),
+        );
+      }
+      // new incoming message — bump unread count and move chat to top
+      if (data.message && data.from) {
+        const senderId = data.from;
+        const isViewingThisChat = pathname === `/messages/${senderId}`;
+
+        setRecentChats((prev) => {
+          const exists = prev.some((c) => c.user_id === senderId);
+
+          if (!exists) {
+            // shouldn't normally happen since an accepted connection
+            // already creates an entry, but fall back to a full refresh just in case
+            api.get("/conversations").then((res) => setRecentChats(res.data));
+            return prev;
+          }
+
+          const updated = prev.map((c) =>
+            c.user_id === senderId
+              ? {
+                  ...c,
+                  last_message: data.message,
+                  unread_msg_count: isViewingThisChat
+                    ? 0
+                    : c.unread_msg_count + 1,
+                }
+              : c,
+          );
+
+          // move the updated chat to the top, like a real chat app
+          const chat = updated.find((c) => c.user_id === senderId)!;
+          const rest = updated.filter((c) => c.user_id !== senderId);
+          return [chat, ...rest];
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [addListener, pathname]);
+
+  useEffect(() => {
+    const match = pathname.match(/^\/messages\/(\d+)$/);
+    if (!match) return;
+
+    const openUserId = parseInt(match[1]);
+
+    setRecentChats((prev) =>
+      prev.map((c) =>
+        c.user_id === openUserId ? { ...c, unread_msg_count: 0 } : c,
+      ),
+    );
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleLocalBlock = (e: Event) => {
+      const { userId } = (e as CustomEvent).detail;
+      setRecentChats((prev) => prev.filter((c) => c.user_id !== userId));
+    };
+
+    window.addEventListener("connection-blocked-local", handleLocalBlock);
+    return () =>
+      window.removeEventListener("connection-blocked-local", handleLocalBlock);
+  }, []);
+
+  useEffect(() => {
+    const handleLocalAccept = (e: Event) => {
+      api.get("/conversations").then((res) => setRecentChats(res.data));
+    };
+    window.addEventListener("connection-accepted-local", handleLocalAccept);
+    return () =>
+      window.removeEventListener(
+        "connection-accepted-local",
+        handleLocalAccept,
+      );
   }, []);
 
   return (
@@ -165,7 +258,7 @@ export default function Navbar() {
                 <li key={chat.user_id}>
                   <Link
                     href={`/messages/${chat.user_id}`}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition"
+                    className="flex items-top justify-between px-3 py-2 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition"
                     onClick={() => setLeftOpen(false)}
                   >
                     <div className="flex flex-col overflow-hidden">
@@ -238,6 +331,7 @@ export default function Navbar() {
                 onClick={() => {
                   showConfirm("Are you sure you want to log out?", () => {
                     localStorage.removeItem("token");
+                    window.dispatchEvent(new Event("auth-changed"));
                     router.push("/auth/login");
                   });
                 }}

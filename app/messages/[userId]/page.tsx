@@ -3,6 +3,8 @@ import { api } from "@/app/src/services/api";
 import { useState, useEffect, useRef, FormEvent, ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAlert } from "@/app/Context/AlertContext";
+import { useWebSocketContext } from "@/app/Context/WebSocketContext";
+import { FaL } from "react-icons/fa6";
 
 interface Message {
   id: number;
@@ -30,14 +32,13 @@ export default function MessageThread() {
   const [isTyping, setIsTyping] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [blocking, setBlocking] = useState(false);
-
-  const ws = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
   const { showConfirm, showAlert } = useAlert();
+  const { sendJson, addListener } = useWebSocketContext();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,33 +112,33 @@ export default function MessageThread() {
   }, [userId]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !userId) return;
-
-    const socket = new WebSocket(`ws://127.0.0.1:8000/ws?token=${token}`);
-    ws.current = socket;
-
-    socket.onopen = () => console.log("Connected to chat server");
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type == "presence" && data.user_id.toString() == userId) {
+    const unsubscribe = addListener((data) => {
+      if (
+        data.type === "connection_blocked" &&
+        data.user_id.toString() === userId
+      ) {
+        showAlert("This user is no longer avalable to chat", false);
+        router.push("/");
+        return;
+      }
+      
+      if (data.type === "presence" && data.user_id?.toString() === userId) {
         setUserStatus(data.status);
-        if (data.status == "offline" && data.last_seen) {
+        if (data.status === "offline" && data.last_seen) {
           setLastSeen(data.last_seen);
         }
         return;
       }
 
-      if (data.type === "typing" && data.from.toString() === userId) {
+      if (data.type === "typing" && data.from?.toString() === userId) {
         setIsTyping(true);
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 2000);
         return;
       }
 
-      if (data.message) {
+      // only append if this message belongs to the currently open thread
+      if (data.message && data.from?.toString() === userId) {
         setMessages((prev) => [
           ...prev,
           {
@@ -149,41 +150,23 @@ export default function MessageThread() {
             created_at: data.created_at,
           },
         ]);
-
         setIsTyping(false);
       }
-    };
+    });
 
-    socket.onclose = () => console.log("Disconnected from chat server");
-
-    return () => {
-      socket.close();
-    };
-  }, [userId]);
+    return unsubscribe;
+  }, [userId, addListener]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
-
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(
-        JSON.stringify({
-          receiver_id: parseInt(userId),
-          type: "typing",
-        }),
-      );
-    }
+    sendJson({ receiver_id: parseInt(userId), type: "typing" });
   };
 
   const handleSendMessage = (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !ws.current) return;
+    if (!newMessage.trim()) return;
 
-    ws.current.send(
-      JSON.stringify({
-        receiver_id: parseInt(userId),
-        message: newMessage,
-      }),
-    );
+    sendJson({ receiver_id: parseInt(userId), message: newMessage });
 
     setMessages((prev) => [
       ...prev,
@@ -208,6 +191,12 @@ export default function MessageThread() {
         setBlocking(true);
         try {
           await api.post(`/connections/${userId}/block`);
+          window.dispatchEvent(
+            new CustomEvent("connection-blocked-local", {
+              detail: { userId: parseInt(userId) },
+            }),
+          );
+
           router.push("/");
         } catch (err: any) {
           showAlert(
