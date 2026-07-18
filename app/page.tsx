@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "./src/services/api";
+import { useWebSocketContext } from "./Context/WebSocketContext";
 
 interface UserSearchResult {
   id: number;
@@ -34,6 +35,16 @@ export default function Page() {
     };
     fetchMe();
   }, []);
+
+  const {addListener} = useWebSocketContext()
+  useEffect(()=>{
+    const unsubscribe = addListener((data)=>{
+      if(data.type === "connection_accepted" && userResult && data.user_id === userResult.id){
+        setUserResult({...userResult, connection_status: "accepted"})
+      }
+    })
+    return unsubscribe
+  }, [addListener, userResult])
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
@@ -99,7 +110,7 @@ export default function Page() {
         return (
           <p className="text-white/60 text-lg text-center">
             they already sent you a request — check your{" "}
-            <Link href="/requests" className="text-green-400 underline">
+            <Link href="/connections/requests" className="text-green-400 underline">
               incoming requests
             </Link>
           </p>

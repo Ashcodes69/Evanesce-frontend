@@ -43,6 +43,7 @@ export default function Requests() {
       await api.post(`/connections/${connectionId}/accept`);
 
       window.dispatchEvent(new Event("connection-accepted-local"))
+      window.dispatchEvent(new Event("request-handled-local"))
 
       router.push(`/messages/${userId}`)
       
@@ -63,6 +64,7 @@ export default function Requests() {
       setRequests((prev) =>
         prev.filter((r) => r.connection_id !== connectionId),
       );
+      window.dispatchEvent(new Event("request-handled-local"))
     } catch (err) {
       setError("failed to reject request.");
     } finally {

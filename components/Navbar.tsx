@@ -35,7 +35,6 @@ export default function Navbar() {
         // silently ignore here — page-level auth guard should handle redirect
       }
     };
-    fetchMe();
 
     const fetchRequestCount = async () => {
       try {
@@ -45,7 +44,6 @@ export default function Navbar() {
         // silently ignore — non-critical badge
       }
     };
-    fetchRequestCount();
 
     const fetchRecentChats = async () => {
       try {
@@ -55,7 +53,17 @@ export default function Navbar() {
         // silently ignore — non-critical for now
       }
     };
-    fetchRecentChats();
+
+    const loadAll = () => {
+      fetchMe();
+      fetchRequestCount();
+      fetchRecentChats();
+    };
+
+    loadAll();
+
+    window.addEventListener("auth-changed", loadAll);
+    return () => window.removeEventListener("auth-changed", loadAll);
   }, []);
 
   useEffect(() => {
@@ -148,6 +156,41 @@ export default function Navbar() {
       );
   }, []);
 
+  useEffect(() => {
+    const handleLocalMessageSent = (e: Event) => {
+      const { receiverId, message } = (e as CustomEvent).detail;
+
+      setRecentChats((prev) => {
+        const exists = prev.some((c) => c.user_id === receiverId);
+
+        if (!exists) {
+          api.get("/conversations").then((res) => setRecentChats(res.data));
+          return prev;
+        }
+
+        const updated = prev.map((c) =>
+          c.user_id === receiverId ? { ...c, last_message: message } : c,
+        );
+
+        const chat = updated.find((c) => c.user_id === receiverId)!;
+        const rest = updated.filter((c) => c.user_id !== receiverId);
+        return [chat, ...rest];
+      });
+    };
+
+    window.addEventListener("message-sent-local", handleLocalMessageSent);
+    return () =>
+      window.removeEventListener("message-sent-local", handleLocalMessageSent);
+  }, []);
+
+  useEffect(() => {
+    const handleRequestHandled = () => {
+      setRequestCount((prev) => Math.max(0, prev - 1));
+    };
+    window.addEventListener("request-handled-local", handleRequestHandled);
+    return () =>
+      window.removeEventListener("request-handled-local", handleRequestHandled);
+  }, []);
   return (
     <>
       {/* Top navbar */}

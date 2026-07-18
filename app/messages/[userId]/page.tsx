@@ -121,7 +121,7 @@ export default function MessageThread() {
         router.push("/");
         return;
       }
-      
+
       if (data.type === "presence" && data.user_id?.toString() === userId) {
         setUserStatus(data.status);
         if (data.status === "offline" && data.last_seen) {
@@ -179,6 +179,12 @@ export default function MessageThread() {
         created_at: new Date().toISOString(),
       },
     ]);
+
+    window.dispatchEvent(
+      new CustomEvent("message-sent-local", {
+        detail: { receiverId: parseInt(userId), message: newMessage },
+      }),
+    );
 
     setNewMessage("");
   };
