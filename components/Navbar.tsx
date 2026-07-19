@@ -351,14 +351,13 @@ export default function Navbar() {
           </div>
           <ul className="flex flex-col gap-1">
             <li>
-              <button className="w-full text-left px-3 py-2 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition">
-                change username
-              </button>
-            </li>
-            <li>
-              <button className="w-full text-left px-3 py-2 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition">
-                change password
-              </button>
+              <Link
+                href="/settings"
+                onClick={() => setRightOpen(false)}
+                className="block px-3 py-2 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition"
+              >
+                settings
+              </Link>
             </li>
             <li>
               <Link

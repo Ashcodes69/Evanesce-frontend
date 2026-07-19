@@ -120,8 +120,14 @@ export default function Login() {
                   className="mt-1 block w-full rounded-md border border-white/30 bg-transparent px-3 py-2 text-white placeholder-white/30 shadow-sm focus:border-white/70 focus:outline-none sm:text-sm"
                   placeholder="••••••••"
                 />
-              </div>
 
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-sm text-white/50 hover:text-white/80 underline"
+                >
+                  forgot password?
+                </Link>
+              </div>
               <div>
                 <button
                   type="submit"
