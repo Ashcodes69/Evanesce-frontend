@@ -111,51 +111,89 @@ export default function MessageThread() {
     if (userId) fetchChatData();
   }, [userId]);
 
-  useEffect(() => {
-    const unsubscribe = addListener((data) => {
-      if (
-        data.type === "connection_blocked" &&
-        data.user_id.toString() === userId
-      ) {
-        showAlert("This user is no longer avalable to chat", false);
-        router.push("/");
-        return;
-      }
+useEffect(() => {
+  const unsubscribe = addListener((data) => {
+    console.log("WS event received:", data);
+    if (
+      data.type === "connection_blocked" &&
+      data.user_id.toString() === userId
+    ) {
+      showAlert("This user is no longer avalable to chat", false);
+      router.push("/");
+      return;
+    }
 
-      if (data.type === "presence" && data.user_id?.toString() === userId) {
-        setUserStatus(data.status);
-        if (data.status === "offline" && data.last_seen) {
-          setLastSeen(data.last_seen);
-        }
-        return;
+    if (data.type === "presence" && data.user_id?.toString() === userId) {
+      setUserStatus(data.status);
+      if (data.status === "offline" && data.last_seen) {
+        setLastSeen(data.last_seen);
       }
+      return;
+    }
 
-      if (data.type === "typing" && data.from?.toString() === userId) {
-        setIsTyping(true);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 2000);
-        return;
+    if (data.type === "typing" && data.from?.toString() === userId) {
+      setIsTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 2000);
+      return;
+    }
+
+    // only append if this message belongs to the currently open thread
+    if (data.message && data.from?.toString() === userId) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: data.message_id || Date.now(),
+          sender_id: data.from,
+          receiver_id: parseInt(userId),
+          content: data.message,
+          status: data.status,
+          created_at: data.created_at,
+        },
+      ]);
+      setIsTyping(false);
+
+      // mark as seen immediately since the user is actively viewing this thread
+      const token = localStorage.getItem("token");
+      if (token) {
+        api.put(
+          `/messages/seen/${userId}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
       }
+      return;
+    }
 
-      // only append if this message belongs to the currently open thread
-      if (data.message && data.from?.toString() === userId) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: data.message_id || Date.now(),
-            sender_id: data.from,
-            receiver_id: parseInt(userId),
-            content: data.message,
-            status: data.status,
-            created_at: data.created_at,
-          },
-        ]);
-        setIsTyping(false);
-      }
-    });
+    if (data.type === "message_ack") {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.client_id
+            ? {
+                ...m,
+                id: data.message_id,
+                status: data.status,
+                created_at: data.created_at,
+              }
+            : m,
+        ),
+      );
+      return;
+    }
 
-    return unsubscribe;
-  }, [userId, addListener]);
+    if (data.type === "message_hidden_sender") {
+      setMessages((prev) => prev.filter((m) => m.id !== data.message_id));
+      return;
+    }
+
+    if (data.type === "message_deleted") {
+      setMessages((prev) => prev.filter((m) => m.id !== data.message_id));
+      return;
+    }
+  });
+
+  return unsubscribe;
+}, [userId, addListener]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
@@ -166,12 +204,18 @@ export default function MessageThread() {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    sendJson({ receiver_id: parseInt(userId), message: newMessage });
+    const tempId = Date.now();
+
+    sendJson({
+      receiver_id: parseInt(userId),
+      message: newMessage,
+      client_id: tempId,
+    });
 
     setMessages((prev) => [
       ...prev,
       {
-        id: Date.now(),
+        id: tempId,
         sender_id: -1,
         receiver_id: parseInt(userId),
         content: newMessage,
